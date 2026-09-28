@@ -13,12 +13,16 @@
 -- MAGIC    dashboard (Tableau Public can't connect live to Community Edition,
 -- MAGIC    so the gold layer is the hand-off point)
 -- MAGIC
--- MAGIC **Before running this notebook:** upload the 7 Olist CSVs used here to
--- MAGIC `/FileStore/tables/` (Catalog > Add Data > Upload files to DBFS, or drag
--- MAGIC into the Upload UI). Files needed: `olist_orders_dataset.csv`,
--- MAGIC `olist_order_items_dataset.csv`, `olist_customers_dataset.csv`,
--- MAGIC `olist_sellers_dataset.csv`, `olist_products_dataset.csv`,
--- MAGIC `olist_order_payments_dataset.csv`, `product_category_name_translation.csv`.
+-- MAGIC **Before running this notebook:** upload the 7 Olist CSVs used here to a
+-- MAGIC Unity Catalog Volume (Catalog > Add Data > Upload files to Volume; create
+-- MAGIC a volume if prompted, e.g. workspace/default/volumev). Newer Databricks
+-- MAGIC workspaces have the public DBFS root disabled, so the old
+-- MAGIC `/FileStore/tables/` upload path won't work. Files needed:
+-- MAGIC `olist_orders_dataset.csv`, `olist_order_items_dataset.csv`,
+-- MAGIC `olist_customers_dataset.csv`, `olist_sellers_dataset.csv`,
+-- MAGIC `olist_products_dataset.csv`, `olist_order_payments_dataset.csv`,
+-- MAGIC `product_category_name_translation.csv`. Update `VOLUME_PATH` in the
+-- MAGIC raw-layer cell below to match your volume's actual path.
 
 -- COMMAND ----------
 
@@ -32,9 +36,13 @@ CREATE SCHEMA IF NOT EXISTS olist_raw;
 -- COMMAND ----------
 
 -- MAGIC %python
--- MAGIC # Read each uploaded CSV and write it out as a raw Delta table.
--- MAGIC # Adjust the /FileStore/tables/ path below if Databricks renamed your
--- MAGIC # upload (it sometimes appends a suffix like _1 on re-upload).
+-- MAGIC # Read each uploaded CSV (from a Unity Catalog Volume -- newer Databricks
+-- MAGIC # workspaces have the public DBFS root disabled, so /FileStore/tables/
+-- MAGIC # no longer works; files must live in a Volume instead) and write it out
+-- MAGIC # as a raw Delta table. Adjust VOLUME_PATH below to match your own
+-- MAGIC # catalog/schema/volume names if they differ.
+-- MAGIC
+-- MAGIC VOLUME_PATH = "/Volumes/workspace/default/volumev"
 -- MAGIC
 -- MAGIC files = {
 -- MAGIC     "orders": "olist_orders_dataset.csv",
@@ -47,7 +55,7 @@ CREATE SCHEMA IF NOT EXISTS olist_raw;
 -- MAGIC }
 -- MAGIC
 -- MAGIC for table_name, filename in files.items():
--- MAGIC     df = spark.read.csv(f"/FileStore/tables/{filename}", header=True, inferSchema=True)
+-- MAGIC     df = spark.read.csv(f"{VOLUME_PATH}/{filename}", header=True, inferSchema=True)
 -- MAGIC     df.write.mode("overwrite").saveAsTable(f"olist_raw.{table_name}")
 -- MAGIC     print(f"olist_raw.{table_name}: {df.count():,} rows")
 
