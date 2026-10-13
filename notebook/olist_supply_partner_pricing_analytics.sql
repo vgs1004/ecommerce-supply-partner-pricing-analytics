@@ -180,6 +180,38 @@ SELECT * FROM olist_raw.gold_discount_depth_vs_volume ORDER BY units_sold DESC L
 
 -- COMMAND ----------
 
+-- MAGIC %md **Known limitation found during the Tableau build:** `avg_discount_pct`
+-- MAGIC above is 0 for every product. Because the reference price is the product's
+-- MAGIC own average price, and rows are grouped by that same product, the average
+-- MAGIC deviation from it always cancels out to zero. The column is kept so the
+-- MAGIC exported CSV stays reproducible, but it is not used in the dashboard.
+-- MAGIC
+-- MAGIC The dashboard instead measures **price positioning**: each product's average
+-- MAGIC price relative to the average product price in its category (a price index,
+-- MAGIC where 1.0 = category average). In Tableau this is a calculated field with a
+-- MAGIC FIXED LOD expression:
+-- MAGIC `[Avg Price Paid] / {FIXED [Category] : AVG([Avg Price Paid])}`.
+-- MAGIC The query below produces the same metric in SQL for reference.
+
+-- COMMAND ----------
+
+SELECT
+    category,
+    product_id,
+    units_sold,
+    avg_price_paid,
+    ROUND(avg_price_paid / AVG(avg_price_paid) OVER (PARTITION BY category), 3) AS price_index_vs_category,
+    CASE
+        WHEN avg_price_paid / AVG(avg_price_paid) OVER (PARTITION BY category) < 0.5  THEN '1. Under 50%'
+        WHEN avg_price_paid / AVG(avg_price_paid) OVER (PARTITION BY category) < 0.8  THEN '2. 50-80%'
+        WHEN avg_price_paid / AVG(avg_price_paid) OVER (PARTITION BY category) <= 1.2 THEN '3. 80-120%'
+        WHEN avg_price_paid / AVG(avg_price_paid) OVER (PARTITION BY category) <= 2   THEN '4. 120-200%'
+        ELSE '5. Over 200%'
+    END AS price_band
+FROM olist_raw.gold_discount_depth_vs_volume;
+
+-- COMMAND ----------
+
 -- MAGIC %md ### 3d. Delivery time by seller
 
 -- COMMAND ----------
